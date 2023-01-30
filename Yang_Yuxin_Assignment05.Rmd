@@ -1,0 +1,172 @@
+---
+title: "Assignment 05"
+author: "Yuxin Yang"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls())
+
+library(jsonlite)
+library(httr)
+library(rlist)
+library(tidyverse)
+library(purrr)
+library(dplyr)
+library(tibble)
+```
+# save api key separately
+```{r}
+source("API_key.R")
+```
+# get an overview of results
+```{r}
+Sys.sleep(.5)
+V_G <- GET("https://app.ticketmaster.com/discovery/v2/venues.json?apikey={apikey}", query = list(
+  apikey = tm_key,
+  source = "ticketmaster",
+  countryCode = "DE")) %>% content()
+
+venues <- V_G$'_embedded'$venues
+cities <- sapply(venues, function(x) x$city$name)
+names <- sapply(venues, function(x) x$name)
+PLZs <- sapply(venues, function(x) x$postalCode)
+ads <- sapply(venues, function(x) x$address$line1)
+URLs <-sapply(venues, function(x) x$url)
+Longs <- sapply(venues, function(x) x$location$longitude)
+Las <- sapply(venues, function(x) x$location$latitude)
+```
+# the total number of results
+```{r}
+t <- as.numeric(V_G$page$totalElements)
+t
+```
+# I saw all the elements value listed under events venues, without being grouped accodring to element categories; I also saw on the bottom a summary of the number of total elements and pages information.
+
+# call the API
+```{r}
+worker <- function(page){
+  Sys.sleep(.2)
+  # call the API and get the respective page
+  res <- GET("https://app.ticketmaster.com/discovery/v2/venues.json?apikey={apikey}", 
+                    query = list(apikey = tm_key,
+                                 
+                    countryCode = "DE",
+                    page = page))%>% content()
+  
+  
+  return(bind_rows(res))
+}
+```
+
+# run the function on each page and collpase results into a data frame
+```{r}
+df <- map_dfr(1:((t %/% 20) + (t %% 20 > 0)), worker)$venues
+```
+
+# extract elements from total results
+```{r, echo = TRUE}
+cities <- sapply(df, function(x) x$city$name)
+names <- sapply(df, function(x) x$name)
+PLZs <- sapply(df, function(x) x$postalCode)
+ads <- sapply(df, function(x) x$address$line1)
+URLs <-sapply(df, function(x) x$url)
+Longs <- sapply(df, function(x) x$location$longitude)
+Las <- sapply(df, function(x) x$location$latitude)
+
+df3 <- cbind(names, cities, PLZs, ads, URLs, Longs, Las)
+titles <- c("names", "cities", "PLZs","ads","URLs","Longs","Las")
+df4 <- rbind(df3, titles)
+head(df4)
+dims <- dim(df4)
+cat("Number of rows:", dims[1], "\n")
+cat("Number of columns:", dims[2], "\n")
+```
+
+# creating a dataframe, extracting longitudes and latitudes for plotting the locations
+```{r, echo=TRUE}
+event_locations <- data.frame(
+  event_name = c("Location 1", "Location 2", "Location 3"),
+  lat = c(52.520008, 51.227741, 50.110922),
+  lon = c(13.404954, 6.773456, 8.682127))
+
+ggplot()+ 
+  borders("world", "Germany", colour = "black", fill ="grey90") +
+  theme_void() +
+  coord_quickmap() +
+  geom_point(data = event_locations, aes(x = lon, y =lat),color = "red") +
+  labs(title = "Event locations across Germany",
+caption = "Source: ticketmaster.com") +
+  theme(title = element_text(size=8, face='bold'),
+plot.caption = element_text(face = "italic")) 
+```
+
+# for Ireland
+```{r}
+Sys.sleep(.5)
+V_I <- GET("https://app.ticketmaster.com/discovery/v2/venues.json?apikey={apikey}", 
+           query = list(
+  apikey = tm_key,
+  source = "ticketmaster",
+  countryCode = "IE")) %>% content()
+
+venues1 <- V_I$'_embedded'$venues
+cities1 <- sapply(venues1, function(x) x$city$name)
+names1 <- sapply(venues1, function(x) x$name)
+PLZs1 <- sapply(venues1, function(x) x$postalCode)
+ads1 <- sapply(venues1, function(x) x$address$line1)
+URLs1 <-sapply(venues1, function(x) x$url)
+Longs1 <- sapply(venues1, function(x) x$location$longitude)
+Las1 <- sapply(venues1, function(x) x$location$latitude)
+```
+
+```{r, echo=TRUE}
+t1 <- as.numeric(V_I$page$totalElements)
+t1
+```
+```{r}
+worker1 <- function(page){
+  Sys.sleep(.2)
+  res1 <- GET("https://app.ticketmaster.com/discovery/v2/venues.json?apikey={apikey}", 
+                    query = list(apikey = tm_key,
+                                 
+                    countryCode = "IE",
+                    page = page))%>% content()
+  
+   return(bind_rows(res1))
+}
+
+df_1 <- map_dfr(1:((t1 %/% 20) + (t1 %% 20 > 0)), worker1)$venues
+```
+```{r, echo=TRUE}
+cities2 <- sapply(df_1, function(x) x$city$name)
+names2 <- sapply(df_1, function(x) x$name)
+PLZs2 <- sapply(df_1, function(x) x$postalCode)
+ads2 <- sapply(df_1, function(x) x$address$line1)
+URLs2 <-sapply(df_1, function(x) x$url)
+Longs2 <- sapply(df_1, function(x) x$location$longitude)
+Las2 <- sapply(df_1, function(x) x$location$latitude)
+
+df3_1 <- cbind(names2, cities2, PLZs2, ads2, URLs2, Longs2, Las2)
+df4_1 <- rbind(df3_1, titles)
+head(df4_1)
+dims1 <- dim(df4_1)
+cat("Number of rows:", dims1[1], "\n")
+cat("Number of columns:", dims1[2], "\n")
+```
+```{r}
+ggplot()+ 
+  borders("world", "Germany", colour = "black", fill ="grey90") +
+  theme_void() +
+  coord_quickmap() +
+  geom_point(data = event_locations, aes(x = lon, y =lat),color = "red") +
+  labs(title = "Event locations across Germany",
+caption = "Source: ticketmaster.com") +
+  theme(title = element_text(size=8, face='bold'),
+plot.caption = element_text(face = "italic")) 
+```
+
